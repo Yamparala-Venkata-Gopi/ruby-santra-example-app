@@ -1,0 +1,12 @@
+language: ruby
+script: 'true'
+deploy:
+  provider: cloudfoundry
+  target: https://api.de.a9s.eu
+  username: bjuler222@gmail.com
+  password:
+    secure: XqxmJyxwhyes8rFEk+XcAmwVqU5rH+e068gfxT8GgGcld2MebXrQk+gWp5Ypyi2bb4zKXkR4E5J60c4LnWdVJlinkGd5gcRhUAKLZ8oBeZNDt2UdjpgAZqoR8dhCTP7wNWxb6M9hjObOvUn6kjaO1QTSkJgeAFG1ow5rsMwjyPg=
+  organization: bjuler222_gmail_com
+  space: hell
+  on:
+    repo: anynines/ruby-sinatra-example-app
