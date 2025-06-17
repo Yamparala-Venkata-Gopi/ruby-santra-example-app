@@ -29,3 +29,14 @@ manifest.yml
 # Files that might appear on external disk
 .Spotlight-V100
 .Trashes
+
+# Python virtual environment
+venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
