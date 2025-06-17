@@ -40,3 +40,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+
+# SSL certificates (don't commit these to git)
+*.crt
+*.key
+*.pem
+server.crt
+server.key

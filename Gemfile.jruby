@@ -1,0 +1,30 @@
+source "https://rubygems.org"
+
+# Core application gems
+gem "sinatra"
+gem "httparty"
+gem "puma", "~> 6.6"
+
+# JRuby-specific considerations
+platforms :jruby do
+  # JRuby uses Java's SSL implementation, so no need for OpenSSL gem
+  gem "jruby-openssl"  # JRuby's OpenSSL compatibility layer
+end
+
+platforms :ruby do
+  # MRI Ruby needs these
+  gem "webrick"
+  gem "rackup", "~> 2.2"
+end
+
+group :development, :test do
+  gem "rspec"
+  gem "rack-test"
+  
+  # Pry works well with JRuby
+  gem "pry"
+end
+
+group :development do
+  gem "rerun"
+end 

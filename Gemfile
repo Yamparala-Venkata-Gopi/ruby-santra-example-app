@@ -2,12 +2,17 @@ source 'https://rubygems.org'
 
 gem 'sinatra'
 gem 'httparty'
+gem 'webrick'
+gem 'rackup', '~> 2.2'
 
-group :test, :development do
+group :development, :test do
   gem 'rspec'
   gem 'rack-test'
   gem 'pry'
 end
 
-gem "rackup", "~> 2.2"
+group :development do
+  gem 'rerun'
+end
+
 gem "puma", "~> 6.6"
