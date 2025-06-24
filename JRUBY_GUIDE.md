@@ -4,13 +4,15 @@ This guide explains how to run your Sinatra app with **JRuby** instead of standa
 
 ## 🔄 **MRI Ruby vs JRuby Differences**
 
-| Aspect | MRI Ruby | JRuby |
-|--------|----------|-------|
+| Aspect | MRI Ruby | JRuby (with jruby-openssl) |
+|--------|----------|----------------------------|
 | **Platform** | C-based | JVM-based |
-| **SSL/TLS** | OpenSSL C extension | Java JSSE (Java Secure Socket Extension) |
+| **SSL/TLS** | OpenSSL C extension | jruby-openssl (Bouncy Castle) |
+| **API Compatibility** | OpenSSL | OpenSSL (unified interface) |
 | **Performance** | Single-threaded | True multithreading |
 | **Memory** | Lower memory usage | Higher memory (JVM overhead) |
 | **Java Integration** | None | Direct Java library access |
+| **Cryptography** | System OpenSSL | Bouncy Castle (pure Java) |
 
 ## 🛠 **Installation**
 
@@ -28,12 +30,38 @@ rvm use jruby-9.4.5.0
 curl -L https://repo1.maven.org/maven2/org/jruby/jruby-dist/9.4.5.0/jruby-dist-9.4.5.0-bin.tar.gz | tar xz
 ```
 
-### 2. Install Dependencies
+### 2. Install Dependencies with jruby-openssl
 ```bash
-# Use JRuby-specific Gemfile
-bundle install --gemfile=Gemfile.jruby
+# Use JRuby-specific Gemfile (includes jruby-openssl)
+BUNDLE_GEMFILE=Gemfile.jruby bundle install --path vendor/bundle
 
-# Or modify your existing Gemfile to include JRuby platform gems
+# Add java platform to support jruby-openssl
+bundle lock --add-platform java
+
+# Install with proper platform detection
+bundle install --gemfile=Gemfile.jruby --platform=java
+```
+
+### 3. Verify jruby-openssl Installation
+```bash
+# Check if jruby-openssl is working
+jruby -e "require 'openssl'; puts 'OpenSSL Version: ' + OpenSSL::OPENSSL_VERSION"
+
+# Should output something like:
+# OpenSSL Version: OpenSSL 1.1.1 (BC-FIPS) 11 Sep 2018
+```
+
+### 4. Quick Installation Script
+On macOS with Homebrew:
+```bash
+# Install JRuby
+brew install jruby
+
+# Install gems
+BUNDLE_GEMFILE=Gemfile.jruby bundle install
+
+# Test the setup
+./start_jruby.sh
 ```
 
 ## 🚀 **Running with JRuby**
@@ -61,21 +89,45 @@ JRUBY_OPTS="-J-Xmx512m" jruby -S bundle exec puma \
 jruby app_jruby.rb
 ```
 
-## 🔐 **SSL/TLS with JRuby**
+## 🔐 **SSL/TLS with JRuby and jruby-openssl**
 
-### Key Differences:
-1. **Certificate Generation**: Uses system OpenSSL or Java keytool
-2. **SSL Context**: Java's SSLContext instead of Ruby's OpenSSL
-3. **Trust Stores**: Java's trust store system
+### jruby-openssl Overview:
+This app uses **jruby-openssl** which provides OpenSSL-compatible APIs for JRuby using [Bouncy Castle](https://www.bouncycastle.org/) cryptography library under the hood.
 
-### JRuby SSL Configuration:
+### Benefits of jruby-openssl:
+- ✅ **Unified API**: Same OpenSSL interface as MRI Ruby
+- ✅ **Bouncy Castle**: Pure Java crypto implementation
+- ✅ **No C Extensions**: No compilation issues
+- ✅ **Better Integration**: Works seamlessly with Ruby gems expecting OpenSSL
+
+### Implementation:
 ```ruby
-# JRuby-specific SSL imports
+# Universal approach - works with both MRI and JRuby
+require 'openssl'
+
+# On JRuby: uses jruby-openssl (Bouncy Castle)
+# On MRI: uses standard OpenSSL C extension
+
+# Certificate generation works identically:
+key = OpenSSL::PKey::RSA.new(2048)
+cert = OpenSSL::X509::Certificate.new
+# ... same code for both platforms
+```
+
+### Legacy JRuby SSL (not recommended):
+```ruby
+# Old approach - Java-specific SSL imports
 require 'java'
 java_import 'javax.net.ssl.SSLContext'
 java_import 'javax.net.ssl.KeyManagerFactory'
 java_import 'java.security.KeyStore'
 ```
+
+### Bouncy Castle Features:
+- **FIPS Compliance**: Available in BC-FIPS version
+- **Algorithm Support**: Extensive cryptographic algorithms
+- **Performance**: Optimized pure Java implementation
+- **Security**: Regular security updates and audits
 
 ## ⚡ **Performance Benefits**
 

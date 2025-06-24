@@ -4,22 +4,9 @@ require 'sinatra'
 require 'json'
 require 'httparty'
 
-# JRuby-specific SSL handling
-if RUBY_PLATFORM == 'java'
-  # JRuby uses Java's SSL implementation
-  require 'java'
-  java_import 'java.security.KeyStore'
-  java_import 'java.security.cert.X509Certificate'
-  java_import 'javax.net.ssl.KeyManagerFactory'
-  java_import 'javax.net.ssl.SSLContext'
-  puts "🔧 Running on JRuby - using Java SSL implementation"
-else
-  # Standard Ruby (MRI) - use OpenSSL
-  require 'openssl'
-  puts "🔧 Running on MRI Ruby - using OpenSSL"
-end
+# Use jruby-openssl for consistent OpenSSL experience
+require 'openssl'
 
-# SSL Configuration
 configure do
   set :bind, '0.0.0.0'  # Allow external connections
   set :port, 4567       # HTTP port
@@ -28,6 +15,8 @@ end
 
 get '/' do
   ruby_impl = RUBY_PLATFORM == 'java' ? 'JRuby' : 'MRI Ruby'
+  ssl_impl = RUBY_PLATFORM == 'java' ? 'jruby-openssl (Bouncy Castle)' : 'OpenSSL'
+  
   output = "Hello world! Version 3 on #{ruby_impl}! Now with test-suite! </br></br>"
   output += "Available routes: </br>"
   output += "<a href='/google'>/google</a> - Google homepage </br>"
@@ -42,7 +31,8 @@ get '/' do
   output += "HTTPS: <a href='https://#{request.host}:4568'>https://#{request.host}:4568</a> </br></br>"
   
   output += "🔧 Ruby Implementation: #{ruby_impl} (#{RUBY_VERSION}) </br>"
-  output += "🔐 SSL Support: #{RUBY_PLATFORM == 'java' ? 'Java JSSE' : 'OpenSSL'} </br></br>"
+  output += "🔐 SSL Implementation: #{ssl_impl} </br>"
+  output += "🔐 OpenSSL Version: #{OpenSSL::OPENSSL_VERSION rescue 'N/A'} </br></br>"
   
   env_string = JSON.pretty_generate(ENV.to_a).gsub("\\n",'</br>')
   output += "Environment: </br> #{env_string} </br>"
@@ -77,23 +67,19 @@ get '*' do
   "404 - Resource not found"
 end
 
-# SSL Certificate generation - works for both MRI and JRuby
-def generate_ssl_certs_universal
+# SSL Certificate generation using OpenSSL (works with both MRI and jruby-openssl)
+def generate_ssl_certs
   cert_file = 'server.crt'
   key_file = 'server.key'
   
   unless File.exist?(cert_file) && File.exist?(key_file)
-    puts "📜 Generating SSL certificates..."
+    puts "📜 Generating SSL certificates using OpenSSL..."
     
-    if RUBY_PLATFORM == 'java'
-      # JRuby: Use system openssl or Java keytool
-      puts "🔧 JRuby detected - using system OpenSSL command"
-      system("openssl req -x509 -newkey rsa:2048 -keyout #{key_file} -out #{cert_file} -days 365 -nodes -subj '/CN=localhost'")
-    else
-      # MRI Ruby: Use OpenSSL gem
-      puts "🔧 MRI Ruby detected - using OpenSSL gem"
+    begin
+      # Generate RSA private key
       key = OpenSSL::PKey::RSA.new(2048)
       
+      # Create certificate
       cert = OpenSSL::X509::Certificate.new
       cert.version = 2
       cert.serial = 0x0
@@ -101,20 +87,26 @@ def generate_ssl_certs_universal
       cert.not_after = Time.now + (365 * 24 * 60 * 60) # 1 year
       cert.public_key = key.public_key
       
+      # Certificate subject
       subject = "/C=US/ST=Local/L=Local/O=Sinatra App/CN=localhost"
       cert.subject = cert.issuer = OpenSSL::X509::Name.parse(subject)
       
+      # Sign certificate
       cert.sign(key, OpenSSL::Digest::SHA256.new)
       
+      # Write files
       File.write(key_file, key.to_pem)
       File.write(cert_file, cert.to_pem)
+      
+      ssl_impl = RUBY_PLATFORM == 'java' ? 'jruby-openssl (Bouncy Castle)' : 'OpenSSL'
+      puts "✅ SSL certificates generated using #{ssl_impl}: #{cert_file}, #{key_file}"
+      
+    rescue => e
+      puts "❌ Failed to generate SSL certificates: #{e.message}"
+      puts "   This might indicate an issue with the OpenSSL implementation"
     end
-    
-    if File.exist?(cert_file) && File.exist?(key_file)
-      puts "✅ SSL certificates generated: #{cert_file}, #{key_file}"
-    else
-      puts "❌ Failed to generate SSL certificates"
-    end
+  else
+    puts "✅ SSL certificates already exist: #{cert_file}, #{key_file}"
   end
   
   [cert_file, key_file]
@@ -122,10 +114,12 @@ end
 
 # Main execution
 if __FILE__ == $0
-  cert_file, key_file = generate_ssl_certs_universal
+  cert_file, key_file = generate_ssl_certs
   
   ruby_impl = RUBY_PLATFORM == 'java' ? 'JRuby' : 'MRI Ruby'
-  puts "🌐 Starting Sinatra app on #{ruby_impl} with HTTP and HTTPS support..."
+  ssl_impl = RUBY_PLATFORM == 'java' ? 'jruby-openssl (Bouncy Castle)' : 'OpenSSL'
+  
+  puts "🌐 Starting Sinatra app on #{ruby_impl} with #{ssl_impl}..."
   puts "📍 HTTP:  http://0.0.0.0:4567"
   puts "📍 HTTPS: https://0.0.0.0:4568 (self-signed cert)"
   puts ""
